@@ -2,7 +2,7 @@ name: ParkourNK
 main: cn.daoge.parkour.Parkour
 version: "1.0.0"
 api: ["1.0.13"]
-load: STARTUP
+load: POSTWORLD
 author: "daoge_cmd"
 depend:
   - "MemoriesOfTime-GameCore"

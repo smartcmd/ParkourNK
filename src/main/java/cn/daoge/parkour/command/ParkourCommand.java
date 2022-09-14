@@ -10,10 +10,13 @@ import cn.nukkit.command.data.CommandParameter;
 import cn.nukkit.command.exceptions.CommandSyntaxException;
 import cn.nukkit.command.utils.CommandParser;
 import cn.nukkit.lang.TranslationContainer;
+import cn.nukkit.level.Position;
+import cn.nukkit.math.Vector3;
 
 public class ParkourCommand extends Command {
     public ParkourCommand(String name) {
-        super(name, "Parkour Plugin Main Command");
+        super(name, "Parkour Plugin Main Command", "", new String[]{"pk"});
+        this.setPermission("parkour.command.main");
         this.commandParameters.clear();
         this.commandParameters.put("create", new CommandParameter[]{
                 CommandParameter.newEnum("create", new String[]{"create"}),
@@ -29,8 +32,13 @@ public class ParkourCommand extends Command {
                 CommandParameter.newType("name", CommandParamType.STRING),
                 CommandParameter.newType("pos", true, CommandParamType.POSITION)
         });
-        this.commandParameters.put("add route point", new CommandParameter[]{
-                CommandParameter.newEnum("addPoint", new String[]{"addPoint"}),
+        this.commandParameters.put("add point", new CommandParameter[]{
+                CommandParameter.newEnum("point", new String[]{"point"}),
+                CommandParameter.newType("name", CommandParamType.STRING),
+                CommandParameter.newType("pos", true, CommandParamType.POSITION)
+        });
+        this.commandParameters.put("add rank", new CommandParameter[]{
+                CommandParameter.newEnum("rank", new String[]{"rank"}),
                 CommandParameter.newType("name", CommandParamType.STRING),
                 CommandParameter.newType("pos", true, CommandParamType.POSITION)
         });
@@ -57,31 +65,35 @@ public class ParkourCommand extends Command {
                 case "create" -> {
                     parser.parseString();
                     var name = parser.parseString();
-                    var dataPath = plugin.getDataPath().resolve(name);
+                    var dataPath = plugin.getDataPath().resolve(name + ".json");
                     var instance = new ParkourInstance(new JSONParkourStorage(dataPath));
                     instance.getData().name = name;
                     instance.getData().levelName = sender.getPosition().level.getName();
                     plugin.addParkourInstance(instance);
                     instance.save();
-                    sender.sendMessage("§l§aSuccessfully add parkour §c" + name);
+                    sender.sendMessage("[§bParkour§r] Successfully add parkour §a" + name);
                 }
-                case "set start", "set end", "add route point" -> {
+                case "set start", "set end", "add point", "add rank" -> {
                     parser.parseString();
                     var name = parser.parseString();
                     var instance = plugin.getParkourInstanceMap().get(name);
-                    var pos = parser.hasNext() ? parser.parseVector3() : sender.getPosition();
+                    var senderPos = sender.getPosition();
+                    var pos = parser.hasNext() ? parser.parseVector3() : new Vector3(senderPos.x, senderPos.y, senderPos.z);
                     if (form.equals("set start")) {
                         instance.getData().start = pos.floor().add(0.5, 0, 0.5);
                         instance.save();
-                        sender.sendMessage("§l§aSuccessfully set start of parkour §c" + name);
+                        sender.sendMessage("[§bParkour§r] Successfully set start of parkour §a" + name);
                     } else if (form.equals("set end")) {
                         instance.getData().end = pos.floor().add(0.5, 0, 0.5);
                         instance.save();
-                        sender.sendMessage("§l§aSuccessfully set end of parkour §c" + name);
+                        sender.sendMessage("[§bParkour§r] Successfully set end of parkour §a" + name);
+                    } else if (form.equals("add rank")) {
+                        instance.addRankingText(Position.fromObject(pos, instance.getLevel()));
+                        sender.sendMessage("[§bParkour§r] Successfully add ranking text to parkour §a" + name);
                     } else {
                         instance.getData().routePoints.add(pos.floor().add(0.5, 0, 0.5));
                         instance.save();
-                        sender.sendMessage("§l§aSuccessfully add route point to parkour §c" + name);
+                        sender.sendMessage("[§bParkour§r] Successfully add point to parkour §a" + name);
                     }
                 }
             }

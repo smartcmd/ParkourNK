@@ -7,7 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public final class ParkourData {
+public class ParkourData {
     public String levelName;
     public Vector3 start;
     public List<Vector3> routePoints = new ArrayList<>();
@@ -15,5 +15,5 @@ public final class ParkourData {
     public String name;
     //     playerName TimeUsed
     public Map<String, Double> ranking = new HashMap<>();
-    public String rankingTextPos;
+    public List<Vector3> rankingTextPos = new ArrayList<>();
 }
