@@ -113,7 +113,7 @@ public class ParkourInstance implements IParkourInstance{
         for (var other : player.level.getPlayers().values()) other.sendMessage("[§bParkour§r] Player §b" + player.getName() + "§r Finished parkour §a" + this.data.name + "§r in §b" + String.format("%.3f", this.players.get(player).timeUsed) + "s§r ! Congratulations!");
         player.getInventory().clearAll();
         var playingData = this.players.get(player);
-        if (playingData.timeUsed < this.data.ranking.get(player.getName())) {
+        if (!this.data.ranking.containsKey(player.getName()) || playingData.timeUsed < this.data.ranking.get(player.getName())) {
             this.data.ranking.put(player.getName(), Double.parseDouble(String.format("%.3f", this.players.get(player).timeUsed)));
             updateAllRankingText();
         }
