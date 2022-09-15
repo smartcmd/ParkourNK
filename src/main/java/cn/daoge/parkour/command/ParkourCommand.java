@@ -16,7 +16,6 @@ import cn.nukkit.math.Vector3;
 public class ParkourCommand extends Command {
     public ParkourCommand(String name) {
         super(name, "Parkour Plugin Main Command", "", new String[]{"pk"});
-        this.setPermission("parkour.command.main");
         this.commandParameters.clear();
         this.commandParameters.put("create", new CommandParameter[]{
                 CommandParameter.newEnum("create", new String[]{"create"}),
@@ -58,7 +57,7 @@ public class ParkourCommand extends Command {
 
     @Override
     public boolean execute(CommandSender sender, String s, String[] args) {
-        if (!this.testPermission(sender) || !sender.isPlayer()) {
+        if (!sender.isPlayer()) {
             return false;
         }
 
@@ -88,6 +87,9 @@ public class ParkourCommand extends Command {
                     Parkour.getInstance().sendParkourListForm(sender.asPlayer());
                 }
                 case "create" -> {
+                    if (!sender.isOp()) {
+                        return false;
+                    }
                     parser.parseString();
                     var name = parser.parseString();
                     var dataPath = plugin.getDataPath().resolve(name + ".json");
@@ -99,6 +101,9 @@ public class ParkourCommand extends Command {
                     sender.sendMessage("[§bParkour§r] Successfully add parkour §a" + name);
                 }
                 case "set start", "set end", "add point", "add rank", "set tppos" -> {
+                    if (!sender.isOp()) {
+                        return false;
+                    }
                     parser.parseString();
                     var name = parser.parseString();
                     var instance = plugin.getParkourInstanceMap().get(name);
