@@ -9,11 +9,12 @@ import java.util.Map;
 
 public class ParkourData {
     public String levelName;
+    public Vector3 tpPos;
     public Vector3 start;
     public List<Vector3> routePoints = new ArrayList<>();
     public Vector3 end;
     public String name;
     //     playerName TimeUsed
     public Map<String, Double> ranking = new HashMap<>();
-    public List<Vector3> rankingTextPos = new ArrayList<>();
+    public List<LevelVector3> rankingTextPos = new ArrayList<>();
 }

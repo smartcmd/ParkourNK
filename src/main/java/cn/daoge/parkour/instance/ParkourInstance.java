@@ -1,6 +1,7 @@
 package cn.daoge.parkour.instance;
 
 import cn.daoge.parkour.Parkour;
+import cn.daoge.parkour.config.LevelVector3;
 import cn.daoge.parkour.config.ParkourData;
 import cn.daoge.parkour.storage.IParkourStorage;
 import cn.lanink.gamecore.ranking.Ranking;
@@ -28,7 +29,7 @@ public class ParkourInstance implements IParkourInstance{
 
     protected ParkourData data;
     protected IParkourStorage storage;
-    protected Map<Player, PlayingData> players = new HashMap<>();
+    protected Map<Player, PlayingData> playerMap = new HashMap<>();
     protected Set<Ranking> rankings = new HashSet<>();
 
     public ParkourInstance(IParkourStorage storage) {
@@ -38,15 +39,18 @@ public class ParkourInstance implements IParkourInstance{
             this.data = new ParkourData();
         }
         if (!this.data.rankingTextPos.isEmpty()) {
-            this.data.rankingTextPos.forEach(vector3 -> createRankingText(Position.fromObject(vector3, getLevel())));
+            this.data.rankingTextPos.forEach(vector3 -> createRankingText(Position.fromObject(vector3, getLevel(vector3.getLevelName()))));
         }
         Server.getInstance().getScheduler().scheduleRepeatingTask(new RefreshTask(), 1);
     }
 
     @Override
     public Level getLevel() {
+        return getLevel(this.data.levelName);
+    }
+
+    protected Level getLevel(String levelName) {
         var server = Server.getInstance();
-        var levelName = this.data.levelName;
         return Server.getInstance().isLevelLoaded(levelName) ? server.getLevelByName(levelName) : (server.loadLevel(levelName) ? server.getLevelByName(levelName) : null);
     }
 
@@ -59,31 +63,40 @@ public class ParkourInstance implements IParkourInstance{
     public boolean isComplete() {
         return this.getLevel() != null &&
                 this.data.start != null &&
-                this.data.end != null;
+                this.data.end != null &&
+                this.data.tpPos != null;
     }
 
     @Override
     public void join(Player player) {
+        if (!player.floor().equals(this.data.start.floor()) || !player.level.equals(getLevel())) player.teleport(Position.fromObject(this.data.start, getLevel()));
         setParkourItems(player);
-        this.players.put(player, new PlayingData());
+        this.playerMap.put(player, new PlayingData());
         player.sendMessage("[§bParkour§r] Successfully join parkour §a" + this.data.name);
     }
 
     @Override
+    public void tp(Player player) {
+        player.teleport(Position.fromObject(this.data.tpPos, getLevel()));
+        player.sendMessage("[§bParkour§r] Teleport to parkour §a" + this.data.name);
+    }
+
+    @Override
     public void quit(Player player) {
+        player.teleport(this.data.tpPos);
         player.getInventory().clearAll();
-        this.players.remove(player);
+        this.playerMap.remove(player);
         player.sendMessage("[§bParkour§r] Successfully quit parkour §a" + this.data.name);
     }
 
     @Override
     public boolean isPlaying(Player player) {
-        return this.players.containsKey(player);
+        return this.playerMap.containsKey(player);
     }
 
     @Override
     public void pause(Player player, boolean pause) {
-        var playingData = this.players.get(player);
+        var playingData = this.playerMap.get(player);
         playingData.paused = pause;
         if (pause) {
             playingData.pausedLoc = player.getLocation();
@@ -97,39 +110,44 @@ public class ParkourInstance implements IParkourInstance{
 
     @Override
     public boolean isPaused(Player player) {
-        return this.players.get(player).paused;
+        return this.playerMap.get(player).paused;
     }
 
     @Override
     public void onReachPoint(Player player, Vector3 point) {
-        this.players.get(player).lastPoint = point;
+        this.playerMap.get(player).lastPoint = point;
         player.sendMessage("[§bParkour§r] Point reached!");
         player.level.addSound(point, Sound.RANDOM_LEVELUP);
     }
 
     @Override
     public void onReachEnd(Player player) {
-        player.sendMessage("[§bParkour§r] Finished parkour §b" + this.data.name + "§r in §b" + String.format("%.3f", this.players.get(player).timeUsed) + "s§r ! Congratulations!");
-        for (var other : player.level.getPlayers().values()) other.sendMessage("[§bParkour§r] Player §b" + player.getName() + "§r Finished parkour §a" + this.data.name + "§r in §b" + String.format("%.3f", this.players.get(player).timeUsed) + "s§r ! Congratulations!");
+        player.sendMessage("[§bParkour§r] Finished parkour §b" + this.data.name + "§r in §b" + String.format("%.3f", this.playerMap.get(player).timeUsed) + "s§r ! Congratulations!");
+        for (var other : player.level.getPlayers().values()) other.sendMessage("[§bParkour§r] Player §b" + player.getName() + "§r Finished parkour §a" + this.data.name + "§r in §b" + String.format("%.3f", this.playerMap.get(player).timeUsed) + "s§r ! Congratulations!");
         player.getInventory().clearAll();
-        var playingData = this.players.get(player);
+        var playingData = this.playerMap.get(player);
         if (!this.data.ranking.containsKey(player.getName()) || playingData.timeUsed < this.data.ranking.get(player.getName())) {
-            this.data.ranking.put(player.getName(), Double.parseDouble(String.format("%.3f", this.players.get(player).timeUsed)));
+            this.data.ranking.put(player.getName(), Double.parseDouble(String.format("%.3f", this.playerMap.get(player).timeUsed)));
             updateAllRankingText();
         }
         spawnLightning(player);
-        this.players.remove(player);
+        this.playerMap.remove(player);
     }
 
     @Override
     public Vector3 getLastPoint(Player player) {
-        return this.players.get(player).lastPoint;
+        return this.playerMap.get(player).lastPoint;
     }
 
     @Override
     public void addRankingText(Position pos) {
-        this.data.rankingTextPos.add(new Vector3(pos.x, pos.y, pos.z).floor().add(0.5,0.5,0.5));
+        this.data.rankingTextPos.add(new LevelVector3(pos.getFloorX() + 0.5, pos.getFloorY() + 0.5, pos.getFloorZ() + 0.5, pos.level.getName()));
         createRankingText(pos);
+    }
+
+    @Override
+    public Set<Player> getPlayers() {
+        return this.playerMap.keySet();
     }
 
     protected void spawnLightning(Player player) {
@@ -192,7 +210,7 @@ public class ParkourInstance implements IParkourInstance{
         public void onRun(int i) {
             var currentTick = Server.getInstance().getTick();
             var timePassed = 0.05d * (currentTick - lastTick);
-            players.forEach((player, playingData) -> {
+            playerMap.forEach((player, playingData) -> {
                 if (!playingData.paused) playingData.timeUsed += timePassed;
                 player.sendActionBar((playingData.paused ? "§e----Pausing----\n§r" : "") +
                         "Time Used: §a" + String.format("%.3f", playingData.timeUsed), 0, 1, 0);

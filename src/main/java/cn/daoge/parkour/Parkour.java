@@ -12,12 +12,15 @@ import cn.nukkit.event.Listener;
 import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.event.player.PlayerMoveEvent;
 import cn.nukkit.event.player.PlayerQuitEvent;
-import cn.nukkit.form.element.ElementLabel;
-import cn.nukkit.form.window.FormWindowCustom;
+import cn.nukkit.event.player.PlayerRespawnEvent;
+import cn.nukkit.form.element.ElementButton;
+import cn.nukkit.form.element.ElementButtonImageData;
 import cn.nukkit.form.window.FormWindowSimple;
 import cn.nukkit.item.ItemID;
+import cn.nukkit.level.Position;
 import cn.nukkit.plugin.PluginBase;
 import lombok.Getter;
+import lombok.Setter;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -34,6 +37,7 @@ public class Parkour extends PluginBase implements Listener {
     public static final int INFO_ITEM_ID = ItemID.ENCHANTED_BOOK;
     public static final int PAUSE_ITEM_ID = ItemID.CLOCK;
     public static final int ESCAPE_ITEM_ID = ItemID.BED;
+
     @Getter
     protected static Parkour instance;
     protected Map<String, IParkourInstance> parkourInstanceMap = new HashMap<>();
@@ -67,8 +71,15 @@ public class Parkour extends PluginBase implements Listener {
     }
 
     public void joinTo(Player player, IParkourInstance instance) {
+        if (!instance.isComplete()) {
+            player.sendMessage("[§bParkour§r] §cUncompleted parkour instance, please complete it before playing!");
+        }
         this.currentPlayingParkour.put(player, instance);
         instance.join(player);
+    }
+
+    public void tpTo(Player player, IParkourInstance instance) {
+        instance.tp(player);
     }
 
     public void quitFromParkour(Player player) {
@@ -77,17 +88,59 @@ public class Parkour extends PluginBase implements Listener {
         instance.quit(player);
     }
 
-    public void sendParkourInfo(Player player, ParkourData data) {
+    public void sendParkourInfo(Player player, IParkourInstance instance) {
+        var data = instance.getData();
         StringBuilder builder = new StringBuilder();
+        builder.append("§l§fRanking: \n");
         data.ranking.forEach((name, score) -> {
             builder.append("§l[").append(name).append("]: §b").append(score).append("§f\n");
         });
-        FormWindowSimple form = new FormWindowSimple("§l§e Ranking | §f§l" + data.name, builder.toString());
+        FormWindowSimple form = new FormWindowSimple("§l§b Info | §f§l" + data.name, builder.toString());
+        player.showFormWindow(form);
+    }
+
+    public void sendParkourListForm(Player player) {
+        var buttons = this.parkourInstanceMap.values()
+                .stream()
+                .map(inst -> generateListButton(inst))
+                .toList();
+        var form = new FormWindowSimple("§f§lParkour", "", buttons);
+        form.addHandler((player1, i) -> {
+            if (form.getResponse() == null) return;
+            var clickedButton = (ParkourElementButton)form.getResponse().getClickedButton();
+            tpTo(player1, clickedButton.instance);
+        });
         player.showFormWindow(form);
     }
 
     public void addParkourInstance(IParkourInstance instance) {
         this.parkourInstanceMap.put(instance.getData().name, instance);
+    }
+
+    protected ElementButton generateListButton(IParkourInstance instance) {
+        var nameBuilder = new StringBuilder();
+        nameBuilder.append("§f§l").append(instance.getData().name).append("\n§bPlaying: ").append(instance.getPlayers().size());
+        return new ParkourElementButton(nameBuilder.toString(), new ElementButtonImageData("path", "textures/blocks/grass_side_carried.png"), instance);
+    }
+
+    protected class ParkourElementButton extends ElementButton {
+
+        @Getter
+        @Setter
+        protected transient IParkourInstance instance;
+
+        public ParkourElementButton(String text) {
+            super(text);
+        }
+
+        public ParkourElementButton(String text, ElementButtonImageData image) {
+            super(text, image);
+        }
+
+        public ParkourElementButton(String text, ElementButtonImageData image, IParkourInstance instance) {
+            super(text, image);
+            this.instance = instance;
+        }
     }
 
     protected void loadParkourInstance() {
@@ -157,7 +210,7 @@ public class Parkour extends PluginBase implements Listener {
                 player.teleport(lastRoutePoint);
             }
             case INFO_ITEM_ID -> {
-                sendParkourInfo(player, currentPlaying.getData());
+                sendParkourInfo(player, currentPlaying);
             }
             case PAUSE_ITEM_ID -> {
                 currentPlaying.pause(player, !currentPlaying.isPaused(player));
@@ -171,5 +224,14 @@ public class Parkour extends PluginBase implements Listener {
     @EventHandler
     protected void onPlayerQuit(PlayerQuitEvent event) {
         quitFromParkour(event.getPlayer());
+    }
+
+    @EventHandler
+    protected void onPlayerRespawn(PlayerRespawnEvent event) {
+        var player = event.getPlayer();
+        var currentPlaying = currentPlayingParkour.get(player);
+        if (currentPlaying == null) return;
+        var lastRoutePoint = currentPlaying.getLastPoint(player);
+        event.setRespawnPosition(Position.fromObject(lastRoutePoint, player.level));
     }
 }
