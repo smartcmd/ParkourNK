@@ -102,6 +102,7 @@ public class Parkour extends PluginBase implements Listener {
     public void sendParkourListForm(Player player) {
         var buttons = this.parkourInstanceMap.values()
                 .stream()
+                .filter(instance1 -> instance1.isComplete())
                 .map(inst -> generateListButton(inst))
                 .toList();
         var form = new FormWindowSimple("§f§lParkour", "", buttons);
